@@ -1,0 +1,20 @@
+{
+  "NuxtLogo": {
+    "description": "Auto imported from components/NuxtLogo.vue"
+  },
+  "Tutorial": {
+    "description": "Auto imported from components/Tutorial.vue"
+  },
+  "DataSources": {
+    "description": "Auto imported from components/dataSources.ts"
+  },
+  "Headings": {
+    "description": "Auto imported from components/headings.ts"
+  },
+  "PlayerRecord": {
+    "description": "Auto imported from components/playerRecord.ts"
+  },
+  "Reports": {
+    "description": "Auto imported from components/reports.ts"
+  }
+}
