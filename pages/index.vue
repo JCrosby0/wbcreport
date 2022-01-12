@@ -4,6 +4,7 @@
     <div class="files flex flex-col">
       <div v-show="showFileLoadBox" class="fileLoadBox">
         <h2>Data to be loaded:</h2>
+        <p>Note: They all require log-in, and cannot log in to both baseball and softball revo accounts in the same browser simultaneously.</p>
         <div v-for="(ds, i) in datasources" :key="'file'+i" class="revBT">
           <div v-if="playerRecords && recordsBaseball.length === 0 || recordsSoftball.length === 0" class="no-selected">
             <span>Load {{ds.label}} Data</span> -- 
@@ -43,7 +44,7 @@
               class="row cursor-pointer" 
               @click="toggleRow(i, j)">
               <div class="row-summary">
-                <div :class="{'open': showRows[i][j] }" >
+                <div :class="{ 'print-hide': true, 'open': showRows[i][j] }" >
                   <span class="pr-2">{{showRows[i][j] ? "&#8964;" : "&#8250;" }}</span>
                 </div>
                 <div class="label">

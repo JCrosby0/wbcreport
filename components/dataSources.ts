@@ -1,7 +1,7 @@
 export class DataSource {
-  link: string;
-  defaultFileName: string;
   label: string;
+  defaultFileName: string;
+  link: string;
   fileIndex: number;
 
   constructor(
@@ -19,13 +19,13 @@ export class DataSource {
 
 export const datasources = [
   new DataSource (
-    "Revolutionise (Baseball/Tee-ball) Member List",
+    "Revolutionise (Baseball/Tee-ball) Member List (Use Template)",
     'revolutionise-WillettonBaseballClub--Member-Report.csv',
     'https://client.revolutionise.com.au/wbcwildcats/members/reports/', // baseball member report
     0
   ),
   new DataSource (
-    "Revolutionise (Softball) Member List",
+    "Revolutionise (Softball) Member List (Use Template)",
     'revolutionise-WillettonBaseballClubWildcats--Member-Report.csv',
     'https://client.revolutionise.com.au/willettonbcwildcats/members/reports/',
     1
@@ -37,13 +37,13 @@ export const datasources = [
     2
   ),
   new DataSource (
-    "Revolutionise (Baseball) Transaction Report",
+    "Revolutionise (Baseball) Member owing/paid summary",
     'revolutioniseSPORT-WillettonBaseballClub-Transactions-Report.csv', // Baseball paid/owing
     'https://client.revolutionise.com.au/wbcwildcats/finance/reports/#start', // baseball member paid/owing report report
     3
   ),
   new DataSource (
-    "Revolutionise (Softball) Transaction Report",
+    "Revolutionise (Softball) Member owing/paid summary",
     'revolutioniseSPORT-WillettonBaseballClubWildcats-Transactions-Report', // Softball paid/owing
     'https://client.revolutionise.com.au/willettonbcwildcats/finance/reports/#start', //softball member paid/owing report
     4
