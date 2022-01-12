@@ -1,12 +1,5 @@
 [
   {
-    "name": "report",
-    "path": "/report",
-    "component": "/home/jcrosby/projects/wbcreport/pages/report.vue",
-    "chunkName": "pages/report",
-    "_name": "_b1add906"
-  },
-  {
     "name": "index",
     "path": "/",
     "component": "/home/jcrosby/projects/wbcreport/pages/index.vue",
