@@ -2,28 +2,11 @@
   <div class="container mx-auto">
     <h1>WBC Registrar Report</h1>
     <div class="files flex flex-col">
-      <div v-show="showFileLoadBox" class="fileLoadBox">
-        <h2>Data to be loaded:</h2>
-        <p>
-          Note: They all require log-in, and cannot log in to both baseball and
-          softball revo accounts in the same browser simultaneously.
-        </p>
-        <div v-for="(ds, i) in datasources" :key="'file' + i" class="revBT">
-          <div
-            v-if="
-              (playerRecords && recordsBaseball.length === 0) ||
-              recordsSoftball.length === 0
-            "
-            class="no-selected"
-          >
-            <span>Load {{ ds.label }} Data</span> --
-            <a :href="ds.link" target="_blank">Download Link</a><br />
-          </div>
-          <div v-else class="selected print-hide">
-            {{ ds.label }} Data Loaded
-          </div>
-        </div>
-      </div>
+      <FileLoad
+        v-show="showFileLoadBox"
+        :datasources="datasources"
+        :haveData="haveData"
+      />
       <div>
         <input
           class="print-hide"
@@ -41,112 +24,20 @@
     </div>
     <!-- values report for screen display and print -->
     <div v-if="playerRecords.length > 0" class="results">
-      <div v-for="(report, i) in reports" :key="report.label" class="report">
-        <!-- report start -->
-        <h2>{{ report.label }}</h2>
-        <ul>
-          <li
-            v-for="(line, j) in report.dataArray"
-            :key="'membership-' + report.headingArray[j].label"
-          >
-            <!-- row start -->
-            <div class="col cursor-pointer" @click="toggleRow(i, j)">
-              <div class="row-summary">
-                <div :class="{ 'print-hide': true, open: showRows[i][j] }">
-                  <span class="pr-2">{{
-                    showRows[i][j] ? "&#8964;" : "&#8250;"
-                  }}</span>
-                </div>
-                <div class="label">
-                  <span>{{ report.headingArray[j].label }}</span>
-                </div>
-                <div v-if="report.label === 'Amount Outstanding'" class="value">
-                  {{ numberFormat.format(line.balanceOutstanding) }}
-                </div>
-                <div v-else class="value">
-                  {{ line.length }}
-                </div>
-                <div class="tooltip print-hide">
-                  <span>ℹ️</span>
-                  <div class="tooltiptext">
-                    {{ report.headingArray[j].tooltip }}
-                  </div>
-                </div>
-              </div>
-              <div
-                v-if="showRows[i][j]"
-                class="row-detail bg-gray-100 page-break"
-              >
-                <table>
-                  <tr>
-                    <th>Player</th>
-                    <th>Payment Class</th>
-                    <th>Balance Outstanding</th>
-                    <th>Groups</th>
-                  </tr>
-                  <tr
-                    v-for="(player, k) in line.dataArray"
-                    :key="'player' + i + j + k"
-                  >
-                    <td
-                      v-for="(cell, l) in extractData(player)"
-                      :key="'cell' + i + j + k + l"
-                    >
-                      <span :class="{ 'table-cell': true, 'text-sm': l == 1 }">
-                        {{ cell }}
-                      </span>
-                    </td>
-                  </tr>
-                </table>
-                <div class="detail-row"></div>
-              </div>
-            </div>
-            <!-- row end -->
-          </li>
-        </ul>
-        <!-- report end -->
-      </div>
-      <!-- {{ listOfGroups }}
-      {{ teamGroupList }} -->
+      <Report
+        v-for="(report, i) in reports"
+        :key="report.label"
+        class="report"
+        :report="report"
+        :i="i"
+      />
     </div>
     <!-- Explanation of filtering for print report -->
-    <div class="screen-hide page-break text-sm">
-      <h2>Methodology:</h2>
-      <span>Five reports are downloaded and parsed</span>
-      <ul class="summary">
-        <li>
-          A members report showing payment class and groups from revolutionise
-          for both Baseball/Tee-ball and Softball.
-        </li>
-        <li>
-          A transaction report from revolutionise showing amount owed, amount
-          paid and balance for both Baseball/Tee-ball and Softball
-        </li>
-        <li>
-          A membership report from Sportlomo showing actively registered players
-        </li>
-      </ul>
-      <div v-if="playerRecords.length > 0" class="results">
-        <div v-for="report in reports" :key="report.label" class="report">
-          <h3>{{ report.label }}</h3>
-          <ul>
-            <li
-              v-for="(_, j) in report.dataArray"
-              :key="'membership-' + report.headingArray[j].label"
-            >
-              <div class="row">
-                <div class="label">
-                  <span>{{ report.headingArray[j].label }}</span>
-                </div>
-                <div class="print-tooltip">
-                  <span>{{ report.headingArray[j].tooltip }}</span>
-                </div>
-              </div>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
+    <Summary
+      class="screen-hide page-break text-sm"
+      :haveData="haveData"
+      :reports="reports"
+    />
     <!-- TODO: set up numbers to toggle table display of data -->
   </div>
 </template>
@@ -156,6 +47,9 @@ import Vue from "vue";
 import { PlayerRecord } from "@/components/playerRecord";
 import { Reports, ReportLineItem } from "@/components/reports";
 import { DataSource, datasources } from "@/components/dataSources";
+import Report from "@/components/Report.vue";
+import FileLoad from "@/components/FileLoad.vue";
+import Summary from "@/components/Summary.vue";
 import {
   Headings,
   headingsSports,
@@ -226,34 +120,40 @@ const teamGroupList: string[] = [
 
 export default Vue.extend({
   name: "ReportPage",
+  components: {
+    Report,
+    FileLoad,
+    Summary,
+  },
   data() {
+    const headingsByTeam = teamGroupList.map((teamName: string) => {
+      return new Headings(
+        teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
+        `Players with outstanding membership on ${teamName}`
+      );
+    });
     return {
       teamGroupList: teamGroupList as string[],
-      numberFormat: Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }),
       dates: [] as Date[],
       datasources: [...datasources] as DataSource[],
       showFileLoadBox: true,
       sportlomoNotRevolutionise: [] as PlayerRecord[],
-      showRows: [
-        Array(6).fill(false),
-        Array(6).fill(false),
-        Array(3).fill(false),
-        Array(2).fill(false),
-      ] as boolean[][],
       transactionsNotPlayerRecord: [] as string[][],
       playerRecords: [] as PlayerRecord[],
       headingsSports: headingsSports as Headings[],
       headingsFees: headingsFees as Headings[],
       headingsOutstanding: headingsOutstanding as Headings[],
       headingsRegistration: headingsRegistration as Headings[],
+      headingsByTeam: headingsByTeam as Headings[],
     };
   },
   computed: {
+    haveData(): boolean {
+      return (
+        this.playerRecords &&
+        (this.recordsBaseball.length === 0 || this.recordsSoftball.length === 0)
+      );
+    },
     // GROUPS
     // Start with generating a list of groups for manual processing.
     // In future look at a standardised way of splitting out 'team' groups from 'league' or 'coach' groups
@@ -272,7 +172,6 @@ export default Vue.extend({
     },
     // DATES
     formattedDates(): string {
-      console.log("dates: ", this.dates);
       if (this.dates[0].getDate() === this.dates[1].getDate()) {
         return `${this.dates[1].getDate()}/${
           this.dates[1].getMonth() + 1
@@ -288,9 +187,9 @@ export default Vue.extend({
     // PLAYER RECORDS
     recordsBaseball(): PlayerRecord[] {
       return (
-        this.playerRecords.filter((p: PlayerRecord) =>
-          p.sports.includes("Baseball")
-        ) || []
+        this.playerRecords
+          .filter((p: PlayerRecord) => p.sports.includes("Baseball"))
+          .sort((a, b) => (a.name > b.name ? 1 : -1)) || []
       );
     },
     recordsSoftball(): PlayerRecord[] {
@@ -310,9 +209,12 @@ export default Vue.extend({
 
     // MEMBERS
     membersBaseball(): PlayerRecord[] {
-      return this.recordsBaseball.sort((a: PlayerRecord, b: PlayerRecord) =>
-        a.groups > b.groups ? 1 : -1
-      );
+      return this.recordsBaseball.sort((a: PlayerRecord, b: PlayerRecord) => {
+        if (a.paymentClass === b.paymentClass) {
+          return a.name > b.name ? 1 : -1;
+        }
+        return a.paymentClass > b.paymentClass ? 1 : -1;
+      });
     },
     membersSoftball(): PlayerRecord[] {
       return this.recordsSoftball;
@@ -346,9 +248,17 @@ export default Vue.extend({
 
     // FEES
     feesBaseball(): PlayerRecord[] {
-      return this.recordsBaseball.filter(
-        (f: PlayerRecord) => f.balanceBaseball > 0
-      );
+      return this.recordsBaseball
+        .filter((f: PlayerRecord) => f.balanceBaseball > 0)
+        .sort((a: PlayerRecord, b: PlayerRecord) =>
+          a.paymentClass > b.paymentClass
+            ? 1
+            : a.paymentClass < b.paymentClass
+            ? -1
+            : a.name > b.name
+            ? 1
+            : -1
+        );
     },
     feesSoftball(): PlayerRecord[] {
       return this.recordsSoftball.filter(
@@ -397,9 +307,11 @@ export default Vue.extend({
 
     // AMOUNT OUTSTANDING
     amountOutstandingBaseball(): PlayerRecord[] {
-      return this.recordsBaseball.filter(
-        (f: PlayerRecord) => f.balanceBaseball > 0
-      );
+      return this.recordsBaseball
+        .filter((f: PlayerRecord) => f.balanceBaseball > 0)
+        .sort((a: PlayerRecord, b: PlayerRecord) =>
+          a.paymentClass > b.paymentClass ? 1 : -1
+        );
     },
     amountOutstandingSoftball(): PlayerRecord[] {
       return this.recordsSoftball.filter(
@@ -421,23 +333,36 @@ export default Vue.extend({
 
     // REGISTRATION
     registrationBaseball(): PlayerRecord[] {
-      return this.recordsBaseball.filter(
-        (r: PlayerRecord) => r.registered !== true
-      );
+      return this.recordsBaseball
+        .filter((r: PlayerRecord) => r.registered !== true)
+        .sort((a: PlayerRecord, b: PlayerRecord) =>
+          a.paymentClass > b.paymentClass ? 1 : -1
+        );
     },
-    // // softballers have to be fully registered to appear in revolutionise
-    // registrationSoftball(): number {
-    //   return 0
-    // },
-    // // tee-ballers only register with the club
-    // registrationTeeball(): number {
-    //   return 0
-    // },
     registration(): ReportLineItem[] {
       return [
         new ReportLineItem(this.registrationBaseball),
         new ReportLineItem(this.sportlomoNotRevolutionise),
       ];
+    },
+    // generate a report by team
+    byTeam(): ReportLineItem[] {
+      return teamGroupList.map((teamName: string) => {
+        return new ReportLineItem(
+          this.recordsBaseball
+            .filter(
+              (r: PlayerRecord) =>
+                r.groups
+                  .split(",")
+                  .map((group) => group.trim())
+                  .includes(teamName) &&
+                (r.balanceBaseball > 0 || !r.registered)
+            )
+            .sort((a: PlayerRecord, b: PlayerRecord) =>
+              a.paymentClass > b.paymentClass ? 1 : -1
+            )
+        );
+      });
     },
 
     reports(): Reports[] {
@@ -452,48 +377,25 @@ export default Vue.extend({
         new Reports(
           "Amount Outstanding",
           this.outstanding,
-          this.headingsOutstanding
+          this.headingsOutstanding,
+          ["name", "paymentClass", "balanceBaseball"]
         ),
         new Reports(
           "Members with Outstanding Registration",
           this.registration,
-          this.headingsRegistration
+          this.headingsRegistration,
+          ["name", "paymentClass", "registered"]
+        ),
+        new Reports(
+          "Outstanding Baseballers by Team",
+          this.byTeam,
+          this.headingsByTeam,
+          ["name", "paymentClass", "balanceBaseball", "registered"]
         ),
       ];
     },
   },
   methods: {
-    //extract Data from a PlayerRecord and format it for display
-    extractData(rec: PlayerRecord): string[] {
-      const name = rec.name as string;
-      const paymentClass = rec.paymentClass as string;
-      const balance = ("$" +
-        (+rec.balanceBaseball + +rec.balanceSoftball)) as string;
-      const groups: string = rec.groups
-        .split(",")
-        .filter((g) => this.teamGroupList.includes(g.trim()))
-        .join(", ");
-      return [name, paymentClass, balance, groups];
-    },
-
-    toggleRow(reportIndex: number, lineItemIndex: number) {
-      console.log("reportIndex: ", reportIndex);
-      console.log("lineItemIndex: ", lineItemIndex);
-      // const currentValue = this.reports[reportIndex].dataArray[lineItemIndex].showContent as boolean
-      // console.log('currentValue: ', currentValue)
-      // const newValue = !currentValue
-      // console.log('newValue: ', newValue)
-      // this.$set(
-      //   this.reports[reportIndex].dataArray[lineItemIndex],
-      //   'showContent',
-      //   !this.reports[reportIndex].dataArray[lineItemIndex].showContent
-      // )
-      this.$set(
-        this.showRows[reportIndex],
-        lineItemIndex,
-        !this.showRows[reportIndex][lineItemIndex]
-      );
-    },
     async handleFileChange(event: Event, f: number = 0) {
       const target = event.target as HTMLInputElement;
       const files = target.files as FileList;
@@ -673,7 +575,7 @@ export default Vue.extend({
 });
 </script>
 
-<style scoped>
+<style>
 h1 {
   @apply text-3xl pt-3;
 }
@@ -759,19 +661,7 @@ ul.summary {
   list-style-type: circle;
   padding-left: 2rem;
 }
-/* ul.summary li {
-  margin-left: 1rem;
-}
-ul.summary li::before {
-  content: ">";
-  margin-right: 1rem;
-  margin-left: -1rem;
-  width: 0;
-} */
 
-/* .print-tooltip {
-  @apply w-full;
-} */
 @media print {
   .print-hide {
     display: none;

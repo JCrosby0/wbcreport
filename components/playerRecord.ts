@@ -1,8 +1,8 @@
 export class PlayerRecord {
-  fileIndex: number
-  name: string
-  paymentClass: string
-  groups: string
+  fileIndex: number;
+  name: string;
+  paymentClass: string;
+  groups: string;
   amountOwedBaseball: number = 0;
   amountPaidBaseball: number = 0;
   balanceBaseball: number = 0;
@@ -13,16 +13,16 @@ export class PlayerRecord {
   firstName: string;
   lastName: string;
   sports: string[];
-  
+
   constructor(
     fileIndex: number,
     name: string,
     paymentClass: string,
-    groups: string,
+    groups: string
     // theAmountOwed: number,
     // theAmountPaid: number,
     // theBalance: number,
-    ) {
+  ) {
     // this.amountOwed = theAmountOwed
     // this.amountPaid = theAmountPaid
     // this.balance = theBalance;
@@ -30,10 +30,11 @@ export class PlayerRecord {
     this.name = name;
     this.paymentClass = paymentClass;
     this.groups = groups;
-    [this.lastName, this.firstName] = name!.split(', ')
-    this.sports = []
-    if (paymentClass.match(/Teeball|Tee-ball/)) this.sports.push('Tee-ball')
-    if (paymentClass.match(/Baseball|League|IL|Machine/)) this.sports.push('Baseball')
-    if (fileIndex === 1) this.sports.push('Softball')
+    [this.lastName, this.firstName] = name!.split(", ");
+    this.sports = [];
+    if (paymentClass.match(/Teeball|Tee-ball/)) this.sports.push("Tee-ball");
+    if (paymentClass.match(/Baseball|League|IL|Machine/))
+      this.sports.push("Baseball");
+    if (fileIndex === 1) this.sports.push("Softball");
   }
 }
