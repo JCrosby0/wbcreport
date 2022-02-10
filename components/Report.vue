@@ -75,8 +75,10 @@ import { PlayerRecord } from "@/components/playerRecord";
 const colHeadings = {
   name: "Player",
   paymentClass: "Payment Class",
-  balanceBaseball: "Balance",
-  balanceSoftball: "Balance",
+  balanceBaseball: "Outstanding",
+  balanceSoftball: "Outstanding",
+  amountPaidBaseball: "Paid",
+  amountPaidSoftball: "Paid",
   groups: "Teams",
   registered: "Sportlomo Activated",
 };
@@ -121,6 +123,13 @@ export default Vue.extend({
             +rec["balanceBaseball"] + +rec["balanceSoftball"]
           }` as string;
         }
+
+        if (["amountPaidBaseball", "amountPaidSoftball"].includes(c)) {
+          return `${
+            +rec["amountPaidBaseball"] + +rec["amountPaidSoftball"]
+          }` as string;
+        }
+
         if (c === "registered") return `${!!rec[c]}` as string;
         return rec[c] as string;
       });

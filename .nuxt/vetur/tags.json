@@ -1,9 +1,12 @@
 {
-  "NuxtLogo": {
-    "description": "Auto imported from components/NuxtLogo.vue"
+  "FileLoad": {
+    "description": "Auto imported from components/FileLoad.vue"
   },
-  "Tutorial": {
-    "description": "Auto imported from components/Tutorial.vue"
+  "Report": {
+    "description": "Auto imported from components/Report.vue"
+  },
+  "Summary": {
+    "description": "Auto imported from components/Summary.vue"
   },
   "DataSources": {
     "description": "Auto imported from components/dataSources.ts"

@@ -378,7 +378,7 @@ export default Vue.extend({
           "Amount Outstanding",
           this.outstanding,
           this.headingsOutstanding,
-          ["name", "paymentClass", "balanceBaseball"]
+          ["name", "paymentClass", "amountPaidBaseball", "balanceBaseball"]
         ),
         new Reports(
           "Members with Outstanding Registration",

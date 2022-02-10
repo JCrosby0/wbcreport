@@ -1,5 +1,6 @@
-export { default as NuxtLogo } from '../../components/NuxtLogo.vue'
-export { default as Tutorial } from '../../components/Tutorial.vue'
+export { default as FileLoad } from '../../components/FileLoad.vue'
+export { default as Report } from '../../components/Report.vue'
+export { default as Summary } from '../../components/Summary.vue'
 export { default as DataSources } from '../../components/dataSources.ts'
 export { default as Headings } from '../../components/headings.ts'
 export { default as PlayerRecord } from '../../components/playerRecord.ts'
