@@ -23,6 +23,7 @@
             </div>
             <div v-else class="value">
               {{ line.length }}
+              <!-- {{ line }} -->
             </div>
             <div class="tooltip print-hide">
               <span>ℹ️</span>
@@ -71,6 +72,7 @@
 <script lang="ts">
 import Vue from "vue";
 import { PlayerRecord } from "@/components/playerRecord";
+import { Reports } from "@/components/reports";
 
 const colHeadings = {
   name: "Player",
@@ -87,9 +89,11 @@ export default Vue.extend({
   props: {
     report: {
       required: true,
+      type: Reports,
     },
     i: {
       required: true,
+      type: Number,
     },
   },
   data() {

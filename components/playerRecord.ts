@@ -13,6 +13,9 @@ export class PlayerRecord {
   firstName: string;
   lastName: string;
   sports: string[];
+  isBaseball: boolean = false;
+  isSoftball: boolean = false;
+  isTeeball: boolean = false;
 
   constructor(
     fileIndex: number,
@@ -32,9 +35,17 @@ export class PlayerRecord {
     this.groups = groups;
     [this.lastName, this.firstName] = name!.split(", ");
     this.sports = [];
-    if (paymentClass.match(/Teeball|Tee-ball/)) this.sports.push("Tee-ball");
-    if (paymentClass.match(/Baseball|League|IL|Machine/))
+    if (paymentClass.match(/Teeball|Tee-ball/)) {
+      this.sports.push("Tee-ball");
+      this.isTeeball = true;
+    }
+    if (paymentClass.match(/Baseball|League|IL|Machine/)) {
       this.sports.push("Baseball");
-    if (fileIndex === 1) this.sports.push("Softball");
+      this.isBaseball = true;
+    }
+    if (fileIndex === 1) {
+      this.sports.push("Softball");
+      this.isSoftball = true;
+    }
   }
 }

@@ -18,12 +18,18 @@
           defaultValue="Choose File(s)"
         />
       </div>
-      <span v-if="this.dates.length">
-        Files downloaded: {{ formattedDates }}
-      </span>
+      <span v-if="dates.length"> Files downloaded: {{ formattedDates }} </span>
     </div>
     <!-- values report for screen display and print -->
     <div v-if="playerRecords.length > 0" class="results">
+      <button class="border-2 px-2 py-1" @click="uploadReport">
+        {{ uploadBtnText }}
+      </button>
+      <a
+        href="https://docs.google.com/spreadsheets/d/1-Dv7yxqmUi9XSfHylF0IChUyRIMiGUEcwjY2NqN20h4/edit#gid=0"
+        target="_blank"
+        >Open Report in Google Sheets</a
+      >
       <Report
         v-for="(report, i) in reports"
         :key="report.label"
@@ -93,8 +99,22 @@ let parseRow = function (row: string) {
   return values;
 };
 
+interface RecordsBySport {
+  baseball: PlayerRecord[];
+  softball: PlayerRecord[];
+  teeball: PlayerRecord[];
+}
+
+// list of groups, generated using this.listOfGroups()
+// Revo insert's parent group 'Baseball' during the export
 const teamGroupList: string[] = [
   // "Baseball Big League",
+  "Baseball Adult A Grade",
+  "Baseball Adult B Grade",
+  "Baseball Adult C Grade",
+  "Baseball Adult D Grade",
+  "Baseball Adult E Grade",
+  "Baseball Adult G Grade",
   "Baseball IL - Green",
   // "Baseball IL - Green (Coach)",
   "Baseball IL - White",
@@ -118,6 +138,13 @@ const teamGroupList: string[] = [
   "Teeball Tee-Ball 6 to 12",
 ];
 
+const headingsByTeam = teamGroupList.map((teamName: string) => {
+  return new Headings(
+    teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
+    `Players with outstanding membership on ${teamName}`
+  );
+});
+
 export default Vue.extend({
   name: "ReportPage",
   components: {
@@ -126,50 +153,52 @@ export default Vue.extend({
     Summary,
   },
   data() {
-    const headingsByTeam = teamGroupList.map((teamName: string) => {
-      return new Headings(
-        teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
-        `Players with outstanding membership on ${teamName}`
-      );
-    });
+    // const headingsByTeam = teamGroupList.map((teamName: string) => {
+    //   return new Headings(
+    //     teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
+    //     `Players with outstanding membership on ${teamName}`
+    //   );
+    // });
     return {
+      uploadingStatus: false,
+      uploadBtnText: "Upload Report to Excel",
       teamGroupList: teamGroupList as string[],
       dates: [] as Date[],
       datasources: [...datasources] as DataSource[],
       showFileLoadBox: true,
+
+      playerRecords: [] as PlayerRecord[],
+      records: {
+        baseball: [],
+        softball: [],
+        teeball: [],
+      } as RecordsBySport,
       sportlomoNotRevolutionise: [] as PlayerRecord[],
       transactionsNotPlayerRecord: [] as string[][],
-      playerRecords: [] as PlayerRecord[],
-      headingsSports: headingsSports as Headings[],
-      headingsFees: headingsFees as Headings[],
-      headingsOutstanding: headingsOutstanding as Headings[],
-      headingsRegistration: headingsRegistration as Headings[],
-      headingsByTeam: headingsByTeam as Headings[],
+      reports: [] as Reports[],
     };
+  },
+  async mounted() {
+    // const test = await fetch("/.netlify/functions/hello-world")
+    //   .then((res) => {
+    //     return res.json();
+    //   })
+    //   .catch((err) => console.error("Someting went wrong", err));
+    // console.log(test.message);
+    // const rows = await fetch("/.netlify/functions/google-sheets3")
+    //   .then((res) => res.json())
+    //   .catch((err) => console.error("Someting went wrong", err));
+    // console.log(rows.message);
   },
   computed: {
     haveData(): boolean {
       return (
         this.playerRecords &&
-        (this.recordsBaseball.length === 0 || this.recordsSoftball.length === 0)
+        (this.records?.baseball.length === 0 ||
+          this.records?.softball.length === 0)
       );
     },
-    // GROUPS
-    // Start with generating a list of groups for manual processing.
-    // In future look at a standardised way of splitting out 'team' groups from 'league' or 'coach' groups
-    listOfGroups(): string[] {
-      return this.recordsBaseball
-        .reduce((acc: string[], cur: PlayerRecord) => {
-          cur.groups.split(",").forEach((group: string) => {
-            const groupName = group.trim();
-            if (!!groupName && !acc.includes(groupName)) {
-              acc.push(groupName);
-            }
-          });
-          return acc;
-        }, [])
-        .sort((a, b) => (a > b ? 1 : -1));
-    },
+
     // DATES
     formattedDates(): string {
       if (this.dates[0].getDate() === this.dates[1].getDate()) {
@@ -183,173 +212,104 @@ export default Vue.extend({
         this.dates[1].getMonth() + 1
       }/${this.dates[1].getFullYear()}`;
     },
+  },
+  methods: {
+    /**
+     * Called at the end of file parsing in the handleFileChange event. It follows:
+      - parsePlayerRecords;
+      - parseTransactions();
+      - parseBaseballRegistration();
+      Which means the following should be available
+      - this.playerRecords
+      - this.sportlomoNotRevolutionise
+     */
+    prepareDataForReport(): void {
+      // sort the records one time
+      if (!this.playerRecords.length) console.warn("No data found...");
 
-    // PLAYER RECORDS
-    recordsBaseball(): PlayerRecord[] {
-      return (
-        this.playerRecords
-          .filter((p: PlayerRecord) => p.sports.includes("Baseball"))
-          .sort((a, b) => (a.name > b.name ? 1 : -1)) || []
-      );
-    },
-    recordsSoftball(): PlayerRecord[] {
-      return (
-        this.playerRecords.filter((p: PlayerRecord) =>
-          p.sports.includes("Softball")
-        ) || []
-      );
-    },
-    recordsTeeball(): PlayerRecord[] {
-      return (
-        this.playerRecords.filter((p: PlayerRecord) =>
-          p.sports.includes("Tee-ball")
-        ) || []
-      );
-    },
+      // generate filtered lists by sport
+      const fByFees = (p: PlayerRecord, baseball: boolean): boolean => {
+        return p[baseball ? "balanceBaseball" : "balanceSoftball"] > 0;
+      };
 
-    // MEMBERS
-    membersBaseball(): PlayerRecord[] {
-      return this.recordsBaseball.sort((a: PlayerRecord, b: PlayerRecord) => {
-        if (a.paymentClass === b.paymentClass) {
-          return a.name > b.name ? 1 : -1;
+      const filterPRBySport = (
+        sport: string,
+        pr = [] as PlayerRecord[]
+      ): PlayerRecord[] => {
+        // sort function by payment class then by name
+        const sByPaymentClass = (a: PlayerRecord, b: PlayerRecord): number => {
+          if (a.paymentClass === b.paymentClass) {
+            return a.name > b.name ? 1 : -1;
+          }
+          return a.paymentClass > b.paymentClass ? 1 : -1;
+        };
+        // cannot put this.playerRecords in the arguments due to type restriction
+        if (!pr.length) {
+          pr = this.playerRecords;
         }
-        return a.paymentClass > b.paymentClass ? 1 : -1;
-      });
-    },
-    membersSoftball(): PlayerRecord[] {
-      return this.recordsSoftball;
-    },
-    membersTeeball(): PlayerRecord[] {
-      return this.recordsTeeball;
-    },
-    membersTeeballU6(): PlayerRecord[] {
-      return this.recordsTeeball.filter((p: PlayerRecord) => {
-        return p.paymentClass.match(/Teeball under 6/);
-      });
-    },
-    membersTeeballBaseball(): PlayerRecord[] {
-      return this.recordsBaseball.filter((p) =>
-        this.recordsTeeball.includes(p)
-      );
-    },
-    membersTotal(): PlayerRecord[] {
-      return this.playerRecords;
-    },
-    members(): ReportLineItem[] {
-      return [
-        new ReportLineItem(this.membersBaseball),
-        new ReportLineItem(this.membersSoftball),
-        new ReportLineItem(this.membersTeeball),
-        new ReportLineItem(this.membersTeeballU6),
-        new ReportLineItem(this.membersTeeballBaseball),
-        new ReportLineItem(this.membersTotal),
-      ];
-    },
+        // filter by sport and sort
+        return pr
+          .filter((p) =>
+            p.sports
+              .map((s: string) => s.toLowerCase())
+              .includes(sport.toLowerCase())
+          )
+          .sort(sByPaymentClass);
+      };
 
-    // FEES
-    feesBaseball(): PlayerRecord[] {
-      return this.recordsBaseball
-        .filter((f: PlayerRecord) => f.balanceBaseball > 0)
-        .sort((a: PlayerRecord, b: PlayerRecord) =>
-          a.paymentClass > b.paymentClass
-            ? 1
-            : a.paymentClass < b.paymentClass
-            ? -1
-            : a.name > b.name
-            ? 1
-            : -1
-        );
-    },
-    feesSoftball(): PlayerRecord[] {
-      return this.recordsSoftball.filter(
-        (f: PlayerRecord) => f.balanceSoftball > 0
-      );
-    },
-    feesTeeball(): PlayerRecord[] {
-      return this.recordsTeeball.filter(
-        (f: PlayerRecord) => f.balanceBaseball > 0
-      );
-    },
-    feesBaseballInvoiced(): PlayerRecord[] {
-      return this.recordsBaseball.filter((p: PlayerRecord) => {
-        return (
-          p.paymentClass.match(/Invoiced.*(?:Baseball|League).*/) &&
-          p.balanceBaseball > 0
-        );
-      });
-    },
-    feesBaseballPart(): PlayerRecord[] {
-      return this.recordsBaseball.filter((p: PlayerRecord) => {
-        return (
-          p.paymentClass.match(/Part Paid.*(?:Baseball|League).*/) &&
-          p.balanceBaseball > 0
-        );
-      });
-    },
-    feesBaseballSenior(): PlayerRecord[] {
-      return this.recordsBaseball.filter((p: PlayerRecord) => {
-        return (
-          p.paymentClass.match(/(?:Invoiced|Part Paid).*Baseball.*/) &&
-          p.balanceBaseball > 0
-        );
-      });
-    },
-    fees(): ReportLineItem[] {
-      return [
-        new ReportLineItem(this.feesBaseball),
-        new ReportLineItem(this.feesSoftball),
-        new ReportLineItem(this.feesTeeball),
-        new ReportLineItem(this.feesBaseballInvoiced),
-        new ReportLineItem(this.feesBaseballPart),
-        new ReportLineItem(this.feesBaseballSenior),
-      ];
-    },
+      this.records = {
+        baseball: filterPRBySport("baseball"),
+        softball: filterPRBySport("softball"),
+        teeball: filterPRBySport("tee-ball"),
+      };
 
-    // AMOUNT OUTSTANDING
-    amountOutstandingBaseball(): PlayerRecord[] {
-      return this.recordsBaseball
-        .filter((f: PlayerRecord) => f.balanceBaseball > 0)
-        .sort((a: PlayerRecord, b: PlayerRecord) =>
-          a.paymentClass > b.paymentClass ? 1 : -1
-        );
-    },
-    amountOutstandingSoftball(): PlayerRecord[] {
-      return this.recordsSoftball.filter(
-        (f: PlayerRecord) => f.balanceSoftball > 0
-      );
-    },
-    amountOutstandingTeeball(): PlayerRecord[] {
-      return this.recordsTeeball.filter(
-        (f: PlayerRecord) => f.balanceBaseball > 0
-      );
-    },
-    outstanding(): ReportLineItem[] {
-      return [
-        new ReportLineItem(this.amountOutstandingBaseball, "baseball"),
-        new ReportLineItem(this.amountOutstandingSoftball, "softball"),
-        new ReportLineItem(this.amountOutstandingTeeball, "baseball"),
+      // MEMBERS
+      const membersArray = [
+        // baseball members
+        this.records.baseball,
+        // softball members
+        this.records.softball,
+        // teeball members
+        this.records.teeball,
+        // teeball u6
+        this.records.teeball.filter((p: PlayerRecord) =>
+          p.paymentClass.match(/Teeball under 6/)
+        ),
+        // teeballers playing baseball
+        this.records.baseball.filter((p: PlayerRecord) =>
+          this.records.teeball.includes(p)
+        ),
+        // total members
+        this.playerRecords,
       ];
-    },
+      const members = membersArray.map((item) => new ReportLineItem(item));
 
-    // REGISTRATION
-    registrationBaseball(): PlayerRecord[] {
-      return this.recordsBaseball
-        .filter((r: PlayerRecord) => r.registered !== true)
-        .sort((a: PlayerRecord, b: PlayerRecord) =>
-          a.paymentClass > b.paymentClass ? 1 : -1
-        );
-    },
-    registration(): ReportLineItem[] {
-      return [
-        new ReportLineItem(this.registrationBaseball),
+      // FEES
+      const feesArray = [
+        this.records.baseball.filter((p) => fByFees(p, true)),
+        this.records.softball.filter((p) => fByFees(p, false)),
+        this.records.teeball.filter((p) => fByFees(p, true)),
+      ];
+
+      const fees = feesArray.map((item) => new ReportLineItem(item));
+      const outstanding = feesArray.map(
+        (item, i) =>
+          new ReportLineItem(item, ["baseball", "softball", "baseball"][i])
+      );
+
+      // REGISTRATION
+      const registrationBaseball = this.records.baseball.filter(
+        (r: PlayerRecord) => r.registered !== true
+      );
+      const registration = [
+        new ReportLineItem(registrationBaseball),
         new ReportLineItem(this.sportlomoNotRevolutionise),
       ];
-    },
-    // generate a report by team
-    byTeam(): ReportLineItem[] {
-      return teamGroupList.map((teamName: string) => {
+
+      // generate a report by team
+      const byTeam = teamGroupList.map((teamName: string) => {
         return new ReportLineItem(
-          this.recordsBaseball
+          this.records.baseball
             .filter(
               (r: PlayerRecord) =>
                 r.groups
@@ -363,42 +323,79 @@ export default Vue.extend({
             )
         );
       });
-    },
 
-    reports(): Reports[] {
-      return [
-        // new Reports('Player Records', this.records, this.headingsSports),
-        new Reports("Membership Numbers", this.members, this.headingsSports),
-        new Reports(
-          "Members with Outstanding Fees",
-          this.fees,
-          this.headingsFees
-        ),
-        new Reports(
-          "Amount Outstanding",
-          this.outstanding,
-          this.headingsOutstanding,
-          ["name", "paymentClass", "amountPaidBaseball", "balanceBaseball"]
-        ),
+      // finally, generate the data to be iterated to create the reports
+      this.reports = [
+        new Reports("Membership Numbers", members, headingsSports),
+        new Reports("Members with Outstanding Fees", fees, headingsFees),
+        new Reports("Amount Outstanding", outstanding, headingsOutstanding, [
+          "name",
+          "paymentClass",
+          "amountPaidBaseball",
+          "balanceBaseball",
+        ]),
         new Reports(
           "Members with Outstanding Registration",
-          this.registration,
-          this.headingsRegistration,
+          registration,
+          headingsRegistration,
           ["name", "paymentClass", "registered"]
         ),
-        new Reports(
-          "Outstanding Baseballers by Team",
-          this.byTeam,
-          this.headingsByTeam,
-          ["name", "paymentClass", "balanceBaseball", "registered"]
-        ),
+        new Reports("Outstanding Baseballers by Team", byTeam, headingsByTeam, [
+          "name",
+          "paymentClass",
+          "balanceBaseball",
+          "registered",
+        ]),
       ];
     },
-  },
-  methods: {
+
+    // GROUPS
+    // Start with generating a list of groups for manual processing.
+    // In future look at a standardised way of splitting out 'team' groups from 'league' or 'coach' groups
+    listOfGroups(): string[] {
+      return this.records.baseball
+        .reduce((acc: string[], cur: PlayerRecord) => {
+          cur.groups.split(",").forEach((group: string) => {
+            const groupName = group.trim();
+            if (!!groupName && !acc.includes(groupName)) {
+              acc.push(groupName);
+            }
+          });
+          return acc;
+        }, [])
+        .sort((a, b) => (a > b ? 1 : -1));
+    },
+
+    async uploadReport() {
+      console.log("Creating new report...");
+      if (this.uploadingStatus) {
+        console.warn("Upload in progress, wait until complete");
+        return;
+      }
+      this.uploadingStatus = true;
+      this.uploadBtnText = "Uploading... Please wait.";
+
+      // refer https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+
+      const payload = this.playerRecords;
+      const newReport = await fetch("/.netlify/functions/createNewReport", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+        .then((res) => res.json())
+        .catch((err) => console.error("Someting went wrong", err));
+      console.log("New Report Created: ", newReport);
+      this.uploadBtnText = "Upload Complete";
+      this.uploadingStatus = false;
+      return;
+    },
     async handleFileChange(event: Event, f: number = 0) {
       const target = event.target as HTMLInputElement;
       const files = target.files as FileList;
+      // get the dates from the files to provide a summary of when the data was last updated
       this.dates = Array.from(files)
         .reduce(
           (a, c) =>
@@ -409,7 +406,9 @@ export default Vue.extend({
           [9999999999999, 0]
         )
         .map((d) => new Date(d));
-
+      /**
+       * Function to read csv, parse into rectangular array, and select desired columns and handle end rows
+       */
       const readFile = async (
         ev: Event,
         reader: FileReader,
@@ -432,7 +431,11 @@ export default Vue.extend({
         return theCols;
       };
 
+      /**
+       * Specific parsing for player records
+       */
       const parsePlayerRecords = async () => {
+        let promises = [] as Promise<void>[];
         for (let i = 0; i < files!.length; i++) {
           const file = files![i];
           let fileIndex: number;
@@ -444,28 +447,36 @@ export default Vue.extend({
             fileIndex = 0;
           } // baseball membership
           else continue; // this routine doesn't handle the other three files
-
-          const reader = new FileReader();
-          // assign function to the onload event
-          reader.onload = (ev: Event) => {
-            readFile(ev, reader, fileIndex)
-              // specific handling for player records
-              .then((theCols) => {
-                theCols.forEach((row, i) => {
-                  if (row[0] === "Name") return; // ignore header row
-                  this.playerRecords.push(
-                    new PlayerRecord(fileIndex, row[0], row[1], row[2])
-                  );
-                });
-              });
-          };
-          // read the file, triggering the onload event
-          await reader.readAsText(file);
+          promises.push(
+            new Promise((resolve, reject): void => {
+              const reader = new FileReader();
+              // assign function to the onload event
+              reader.onload = async (ev: Event) => {
+                readFile(ev, reader, fileIndex)
+                  // specific handling for player records
+                  .then((theCols) => {
+                    theCols.forEach((row, i) => {
+                      if (row[0] === "Name") return; // ignore header row
+                      this.playerRecords.push(
+                        new PlayerRecord(fileIndex, row[0], row[1], row[2])
+                      );
+                    });
+                    resolve();
+                  })
+                  .catch((err) => reject(err));
+              };
+              // read the file, triggering the onload event
+              reader.readAsText(file);
+            })
+          );
         }
-        return;
+        return promises;
       };
-
+      /**
+       * Specific parsing for transaction data
+       */
       const parseTransactions = async () => {
+        let promises = [] as Promise<void>[];
         for (let i = 0; i < files!.length; i++) {
           const file = files![i];
           let fileIndex: number;
@@ -475,49 +486,58 @@ export default Vue.extend({
             fileIndex = 3;
           } else continue; // this routine doesn't handle the other three files
 
-          const reader = new FileReader();
-          // assign function to the onload event
-          reader.onload = (ev: Event) => {
-            readFile(ev, reader, fileIndex)
-              // specific handling for player records
-              .then((theCols) => {
-                theCols.forEach((row, i) => {
-                  if (["Member", "Total"].includes(row[0])) {
-                    return;
-                  } // ignore header & footer rows
-                  const playerName = row[0];
-                  const index = this.playerRecords.findIndex(
-                    (p: PlayerRecord) =>
-                      p.name.toLowerCase() === playerName.toLowerCase()
-                  );
-                  const record = this.playerRecords[index];
-                  if (record) {
-                    if (fileIndex === 3) {
-                      record.amountOwedBaseball = +row[1];
-                      record.amountPaidBaseball = +row[2];
-                      record.balanceBaseball = +row[3];
-                    }
-                    if (fileIndex === 4) {
-                      record.amountOwedSoftball = +row[1];
-                      record.amountPaidSoftball = +row[2];
-                      record.balanceSoftball = +row[3];
-                    }
+          promises.push(
+            new Promise((resolve, reject): void => {
+              const reader = new FileReader();
+              // assign function to the onload event
+              reader.onload = async (ev: Event) => {
+                readFile(ev, reader, fileIndex)
+                  // specific handling for player records
+                  .then((theCols) => {
+                    theCols.forEach((row, i) => {
+                      if (["Member", "Total"].includes(row[0])) {
+                        return;
+                      } // ignore header & footer rows
+                      const playerName = row[0];
+                      const index = this.playerRecords.findIndex(
+                        (p: PlayerRecord) =>
+                          p.name.toLowerCase() === playerName.toLowerCase()
+                      );
+                      const record = this.playerRecords[index];
+                      if (record) {
+                        if (fileIndex === 3) {
+                          record.amountOwedBaseball = +row[1];
+                          record.amountPaidBaseball = +row[2];
+                          record.balanceBaseball = +row[3];
+                        }
+                        if (fileIndex === 4) {
+                          record.amountOwedSoftball = +row[1];
+                          record.amountPaidSoftball = +row[2];
+                          record.balanceSoftball = +row[3];
+                        }
 
-                    Vue.set(this.playerRecords, index, record);
-                  } else {
-                    if (+row[1] > 0) {
-                      this.transactionsNotPlayerRecord.push(row);
-                    }
-                  }
-                });
-              });
-          };
-          reader.readAsText(file);
+                        Vue.set(this.playerRecords, index, record);
+                      } else {
+                        if (+row[1] > 0) {
+                          this.transactionsNotPlayerRecord.push(row);
+                        }
+                      }
+                    });
+                    resolve();
+                  })
+                  .catch((err) => reject(err));
+              };
+              reader.readAsText(file);
+            })
+          );
         }
-        return;
+        return promises;
       };
-
+      /**
+       * Specific parsing for Sportlomo data
+       */
       const parseBaseballRegistration = async () => {
+        let promises = [] as Promise<void>[];
         for (let i = 0; i < files!.length; i++) {
           const file = files![i];
           let fileIndex = NaN as number;
@@ -526,50 +546,56 @@ export default Vue.extend({
             fileIndex = 2;
           } // sportlomo file
           else continue;
-
-          const reader = new FileReader();
-          // assign function to the onload event
-          reader.onload = (ev: Event) => {
-            readFile(ev, reader, fileIndex)
-              // specific handling for player records
-              .then((theCols) => {
-                theCols.forEach((row) => {
-                  const playerName = row[0];
-                  const index = this.playerRecords.findIndex(
-                    (p: PlayerRecord) =>
-                      p.name.toLowerCase() === playerName.toLowerCase()
-                  );
-                  const record = this.playerRecords[index];
-                  if (record) {
-                    record.registered = true;
-                    Vue.set(this.playerRecords, index, record);
-                  } else {
-                    // fabricate player records, as we don't have the information from SportLomo to do them properly
-                    const pseudoPlayerRecord: PlayerRecord = new PlayerRecord(
-                      -1,
-                      row[0],
-                      "none",
-                      "none"
-                    );
-                    if (row[0] !== "Last Name, Member First Name") {
-                      this.sportlomoNotRevolutionise.push(pseudoPlayerRecord);
-                    }
-                  }
-                });
-              });
-          };
-          // read the file, triggering the onload event
-          reader.readAsText(file);
+          promises.push(
+            new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              // assign function to the onload event
+              reader.onload = async (ev: Event) => {
+                readFile(ev, reader, fileIndex)
+                  // specific handling for player records
+                  .then((theCols) => {
+                    theCols.forEach((row) => {
+                      const playerName = row[0];
+                      const index = this.playerRecords.findIndex(
+                        (p: PlayerRecord) =>
+                          p.name.toLowerCase() === playerName.toLowerCase()
+                      );
+                      const record = this.playerRecords[index];
+                      if (record) {
+                        record.registered = true;
+                        Vue.set(this.playerRecords, index, record);
+                      } else {
+                        // fabricate player records, as we don't have the information from SportLomo to do them properly
+                        const pseudoPlayerRecord: PlayerRecord =
+                          new PlayerRecord(-1, row[0], "none", "none");
+                        if (row[0] !== "Last Name, Member First Name") {
+                          this.sportlomoNotRevolutionise.push(
+                            pseudoPlayerRecord
+                          );
+                        }
+                      }
+                    });
+                    resolve();
+                  })
+                  .catch((err) => reject(err));
+              };
+              // read the file, triggering the onload event
+              reader.readAsText(file);
+            })
+          );
         }
-        return;
+        return promises;
       };
 
-      // playerRecords have to be completed before the others can be executed
+      // Launch parse functions to filter appropriate files and attach onLoad parsing functions.
+      // return promises before preparing data for report
       const records = await parsePlayerRecords();
-      const transactions = parseTransactions();
-      const registration = parseBaseballRegistration();
-      // setTimeout(() => { this.showFileLoadBox = false }, 15)
-      this.showFileLoadBox = false;
+      const transactions = await parseTransactions();
+      const registration = await parseBaseballRegistration();
+      Promise.all([...records, ...transactions, ...registration]).then(() => {
+        this.prepareDataForReport();
+        this.showFileLoadBox = false;
+      });
     },
   },
 });
