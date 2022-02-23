@@ -53,6 +53,7 @@ import Vue from "vue";
 import { PlayerRecord } from "@/components/playerRecord";
 import { Reports, ReportLineItem } from "@/components/reports";
 import { DataSource, datasources } from "@/components/dataSources";
+import { OverviewRow } from "@/components/reportOverview";
 import Report from "@/components/Report.vue";
 import FileLoad from "@/components/FileLoad.vue";
 import Summary from "@/components/Summary.vue";
@@ -104,6 +105,14 @@ interface RecordsBySport {
   softball: PlayerRecord[];
   teeball: PlayerRecord[];
 }
+interface SummaryBySport {
+  baseball: number[];
+  softball: number[];
+  teeball: number[];
+}
+const sports = ["baseball", "softball", "teeball"] as Array<
+  keyof SummaryBySport
+>;
 
 // list of groups, generated using this.listOfGroups()
 // Revo insert's parent group 'Baseball' during the export
@@ -145,6 +154,33 @@ const headingsByTeam = teamGroupList.map((teamName: string) => {
   );
 });
 
+// reduce records into summary
+const summariseRecords = (
+  acc: number[],
+  cur: PlayerRecord,
+  sport: string
+): number[] => {
+  const balance = cur.balanceBaseball + cur.balanceSoftball;
+  const owed = cur.amountOwedBaseball + cur.amountOwedSoftball;
+  const paid = cur.amountPaidBaseball + cur.amountPaidSoftball;
+  const registered = !!cur.registered;
+  // CountMembers
+  acc[0]++;
+  // CountOutstanding
+  balance && acc[1]++;
+  // TotalOwed;
+  acc[2] += owed;
+  // TotalReceived;
+  acc[3] += paid;
+  // TotalOutstanding;
+  acc[4] += balance;
+  // CountRegistered;
+  sport === ("baseball" || "all") && registered && acc[5]++;
+  // CountUnregistered;
+  sport === ("baseball" || "all") && !registered && acc[6]++;
+  return acc;
+};
+
 export default Vue.extend({
   name: "ReportPage",
   components: {
@@ -173,6 +209,11 @@ export default Vue.extend({
         softball: [],
         teeball: [],
       } as RecordsBySport,
+      summary: {
+        baseball: [],
+        softball: [],
+        teeball: [],
+      } as SummaryBySport,
       sportlomoNotRevolutionise: [] as PlayerRecord[],
       transactionsNotPlayerRecord: [] as string[][],
       reports: [] as Reports[],
@@ -228,14 +269,19 @@ export default Vue.extend({
       if (!this.playerRecords.length) console.warn("No data found...");
 
       // generate filtered lists by sport
-      const fByFees = (p: PlayerRecord, baseball: boolean): boolean => {
-        return p[baseball ? "balanceBaseball" : "balanceSoftball"] > 0;
+      const fByFees = (p: PlayerRecord, sport: string): boolean => {
+        return (
+          p[sport === "softball" ? "balanceSoftball" : "balanceBaseball"] > 0
+        );
       };
 
       const filterPRBySport = (
         sport: string,
         pr = [] as PlayerRecord[]
       ): PlayerRecord[] => {
+        // handle teeball case
+        if (sport === "teeball") sport = "tee-ball";
+
         // sort function by payment class then by name
         const sByPaymentClass = (a: PlayerRecord, b: PlayerRecord): number => {
           if (a.paymentClass === b.paymentClass) {
@@ -256,13 +302,15 @@ export default Vue.extend({
           )
           .sort(sByPaymentClass);
       };
-
-      this.records = {
-        baseball: filterPRBySport("baseball"),
-        softball: filterPRBySport("softball"),
-        teeball: filterPRBySport("tee-ball"),
-      };
-
+      // assign this.records and this.summary for each sport
+      sports.forEach((sport) => {
+        const records = filterPRBySport(sport);
+        Vue.set(this.records, sport, records);
+        this.summary[sport] = records.reduce(
+          (acc, cur) => summariseRecords(acc, cur, sport),
+          Array(7).fill(0)
+        );
+      });
       // MEMBERS
       const membersArray = [
         // baseball members
@@ -285,11 +333,9 @@ export default Vue.extend({
       const members = membersArray.map((item) => new ReportLineItem(item));
 
       // FEES
-      const feesArray = [
-        this.records.baseball.filter((p) => fByFees(p, true)),
-        this.records.softball.filter((p) => fByFees(p, false)),
-        this.records.teeball.filter((p) => fByFees(p, true)),
-      ];
+      const feesArray = sports.map((sport): PlayerRecord[] => {
+        return this.records[sport].filter((p) => fByFees(p, sport));
+      });
 
       const fees = feesArray.map((item) => new ReportLineItem(item));
       const outstanding = feesArray.map(
@@ -365,7 +411,10 @@ export default Vue.extend({
         }, [])
         .sort((a, b) => (a > b ? 1 : -1));
     },
-
+    /**
+     * function to call serverless function to upload data to google sheets
+     * prepare data client side to minimise server load in favor of reducing uploads
+     */
     async uploadReport() {
       console.log("Creating new report...");
       if (this.uploadingStatus) {
@@ -377,7 +426,24 @@ export default Vue.extend({
 
       // refer https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
 
-      const payload = this.playerRecords;
+      const clubSummary = this.playerRecords.reduce(
+        (acc, cur) => summariseRecords(acc, cur, "all"),
+        Array(7).fill(0)
+      );
+
+      const overview = [
+        new OverviewRow("Baseball", this.summary.baseball),
+        new OverviewRow("Softball", this.summary.softball),
+        new OverviewRow("Tee-ball", this.summary.teeball),
+        new OverviewRow("Club", clubSummary),
+      ];
+
+      const payload = {
+        playerRecords: this.playerRecords,
+        sportRecords: this.records,
+        overview: overview,
+      };
+
       const newReport = await fetch("/.netlify/functions/createNewReport", {
         method: "POST",
         headers: {

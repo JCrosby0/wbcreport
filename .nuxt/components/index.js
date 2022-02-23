@@ -4,6 +4,7 @@ export { default as Summary } from '../../components/Summary.vue'
 export { default as DataSources } from '../../components/dataSources.ts'
 export { default as Headings } from '../../components/headings.ts'
 export { default as PlayerRecord } from '../../components/playerRecord.ts'
+export { default as ReportOverview } from '../../components/reportOverview.ts'
 export { default as Reports } from '../../components/reports.ts'
 
 // nuxt/nuxt.js#8607

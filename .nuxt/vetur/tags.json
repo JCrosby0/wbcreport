@@ -17,6 +17,9 @@
   "PlayerRecord": {
     "description": "Auto imported from components/playerRecord.ts"
   },
+  "ReportOverview": {
+    "description": "Auto imported from components/reportOverview.ts"
+  },
   "Reports": {
     "description": "Auto imported from components/reports.ts"
   }

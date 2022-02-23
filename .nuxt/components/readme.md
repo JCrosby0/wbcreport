@@ -12,4 +12,5 @@ You can directly use them in pages and other components without the need to impo
 - `<DataSources>` | `<data-sources>` (components/dataSources.ts)
 - `<Headings>` | `<headings>` (components/headings.ts)
 - `<PlayerRecord>` | `<player-record>` (components/playerRecord.ts)
+- `<ReportOverview>` | `<report-overview>` (components/reportOverview.ts)
 - `<Reports>` | `<reports>` (components/reports.ts)
