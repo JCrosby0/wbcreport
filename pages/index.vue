@@ -50,6 +50,9 @@
 
 <script lang="ts">
 import Vue from "vue";
+import getData from "@/components/getData";
+import { parseRow, summariseRecords } from "@/components/functions";
+import { teamGroupList } from "@/components/teamlist";
 import { PlayerRecord } from "@/components/playerRecord";
 import { Reports, ReportLineItem } from "@/components/reports";
 import { DataSource, datasources } from "@/components/dataSources";
@@ -63,42 +66,8 @@ import {
   headingsFees,
   headingsOutstanding,
   headingsRegistration,
+  headingsByTeam,
 } from "@/components/headings";
-
-// https://stackoverflow.com/questions/54860670/how-to-split-a-string-containing-csv-data-with-arbitrary-text-into-a-javascript
-let parseRow = function (row: string) {
-  let isInQuotes = false;
-  let values = [];
-  let val = "";
-
-  for (let i = 0; i < row.length; i++) {
-    switch (row[i]) {
-      case ",":
-        if (isInQuotes) {
-          val += row[i];
-        } else {
-          values.push(val);
-          val = "";
-        }
-        break;
-
-      case '"':
-        if (isInQuotes && i + 1 < row.length && row[i + 1] === '"') {
-          val += '"';
-          i++;
-        } else {
-          isInQuotes = !isInQuotes;
-        }
-        break;
-
-      default:
-        val += row[i];
-        break;
-    }
-  }
-  values.push(val);
-  return values;
-};
 
 interface RecordsBySport {
   baseball: PlayerRecord[];
@@ -114,73 +83,6 @@ const sports = ["baseball", "softball", "teeball"] as Array<
   keyof SummaryBySport
 >;
 
-// list of groups, generated using this.listOfGroups()
-// Revo insert's parent group 'Baseball' during the export
-const teamGroupList: string[] = [
-  // "Baseball Big League",
-  "Baseball Adult A Grade",
-  "Baseball Adult B Grade",
-  "Baseball Adult C Grade",
-  "Baseball Adult D Grade",
-  "Baseball Adult E Grade",
-  "Baseball Adult G Grade",
-  "Baseball IL - Green",
-  // "Baseball IL - Green (Coach)",
-  "Baseball IL - White",
-  // "Baseball Intermediate League",
-  "Baseball JL - Green",
-  "Baseball JL - White",
-  // "Baseball Junior League",
-  "Baseball LL - Black",
-  "Baseball LL - Green",
-  // "Baseball LL - Green (Coach)",
-  "Baseball LL - White",
-  // "Baseball LL - White (Coach)",
-  "Baseball LL - Yellow",
-  // "Baseball Little League",
-  // "Baseball Little League (Coach)",
-  "Baseball Machine Pitch",
-  // "Baseball Machine Pitch (Coach)",
-  "Baseball Senior (Adult) Baseball",
-  "Baseball Senior League",
-  "Baseball Women's Baseball",
-  "Teeball Tee-Ball 6 to 12",
-];
-
-const headingsByTeam = teamGroupList.map((teamName: string) => {
-  return new Headings(
-    teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
-    `Players with outstanding membership on ${teamName}`
-  );
-});
-
-// reduce records into summary
-const summariseRecords = (
-  acc: number[],
-  cur: PlayerRecord,
-  sport: string
-): number[] => {
-  const balance = cur.balanceBaseball + cur.balanceSoftball;
-  const owed = cur.amountOwedBaseball + cur.amountOwedSoftball;
-  const paid = cur.amountPaidBaseball + cur.amountPaidSoftball;
-  const registered = !!cur.registered;
-  // CountMembers
-  acc[0]++;
-  // CountOutstanding
-  balance && acc[1]++;
-  // TotalOwed;
-  acc[2] += owed;
-  // TotalReceived;
-  acc[3] += paid;
-  // TotalOutstanding;
-  acc[4] += balance;
-  // CountRegistered;
-  sport === ("baseball" || "all") && registered && acc[5]++;
-  // CountUnregistered;
-  sport === ("baseball" || "all") && !registered && acc[6]++;
-  return acc;
-};
-
 export default Vue.extend({
   name: "ReportPage",
   components: {
@@ -189,12 +91,6 @@ export default Vue.extend({
     Summary,
   },
   data() {
-    // const headingsByTeam = teamGroupList.map((teamName: string) => {
-    //   return new Headings(
-    //     teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
-    //     `Players with outstanding membership on ${teamName}`
-    //   );
-    // });
     return {
       uploadingStatus: false,
       uploadBtnText: "Upload Report to Excel",
@@ -220,16 +116,8 @@ export default Vue.extend({
     };
   },
   async mounted() {
-    // const test = await fetch("/.netlify/functions/hello-world")
-    //   .then((res) => {
-    //     return res.json();
-    //   })
-    //   .catch((err) => console.error("Someting went wrong", err));
-    // console.log(test.message);
-    // const rows = await fetch("/.netlify/functions/google-sheets3")
-    //   .then((res) => res.json())
-    //   .catch((err) => console.error("Someting went wrong", err));
-    // console.log(rows.message);
+    const data = getData();
+    console.log(data);
   },
   computed: {
     haveData(): boolean {

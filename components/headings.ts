@@ -1,3 +1,5 @@
+import { teamGroupList } from "@/components/teamlist";
+
 export class Headings {
   label: string;
   tooltip: string;
@@ -65,3 +67,10 @@ export const headingsRegistration = [
     "Baseballers registered in Sportlomo but missing from Revolutionise"
   ),
 ];
+
+export const headingsByTeam = teamGroupList.map((teamName: string) => {
+  return new Headings(
+    teamName.slice(0, 8) === "Baseball" ? teamName.slice(9) : teamName,
+    `Players with outstanding membership on ${teamName}`
+  );
+});
