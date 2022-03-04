@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "ntl": "nvm use --lts && ntl dev",
     "dev": "nuxt",
     "build": "nuxt build",
     "start": "nuxt start",

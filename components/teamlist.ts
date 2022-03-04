@@ -1,4 +1,3 @@
-import { Headings } from "@/components/headings";
 export const teamGroupList = [
   // "Baseball Big League",
   "Baseball Adult A Grade",

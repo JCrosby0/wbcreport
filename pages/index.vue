@@ -50,13 +50,13 @@
 
 <script lang="ts">
 import Vue from "vue";
-import getData from "@/components/getData";
 import { parseRow, summariseRecords } from "@/components/functions";
 import { teamGroupList } from "@/components/teamlist";
 import { PlayerRecord } from "@/components/playerRecord";
 import { Reports, ReportLineItem } from "@/components/reports";
 import { DataSource, datasources } from "@/components/dataSources";
 import { OverviewRow } from "@/components/reportOverview";
+import { OutstandingRow } from "@/components/reportOutstanding";
 import Report from "@/components/Report.vue";
 import FileLoad from "@/components/FileLoad.vue";
 import Summary from "@/components/Summary.vue";
@@ -116,8 +116,9 @@ export default Vue.extend({
     };
   },
   async mounted() {
-    const data = getData();
-    console.log(data);
+    // attempt to automate data
+    // const data = await getData();
+    // console.log("data: ", data);
   },
   computed: {
     haveData(): boolean {
@@ -326,11 +327,35 @@ export default Vue.extend({
         new OverviewRow("Club", clubSummary),
       ];
 
+      const outstanding = [] as OutstandingRow[];
+      teamGroupList.forEach((team: string) => {
+        this.playerRecords
+          .filter((pr: PlayerRecord) => {
+            const includesTeam = pr.groups.split(", ").includes(team);
+            return includesTeam;
+          })
+          .filter((pr: PlayerRecord) => {
+            const naughty =
+              (!pr.registered && team.slice(0, 7) !== "Teeball") ||
+              pr.balanceBaseball > 0 ||
+              pr.balanceSoftball > 0;
+            return naughty;
+          })
+          .forEach((pr: PlayerRecord) => {
+            const row = new OutstandingRow(team, pr);
+            outstanding.push(row);
+          });
+      });
+
+      console.log("outstanding: ", outstanding);
+
       const payload = {
         playerRecords: this.playerRecords,
         sportRecords: this.records,
         overview: overview,
+        outstanding: outstanding,
       };
+      console.log("payload: ", payload);
 
       const newReport = await fetch("/.netlify/functions/createNewReport", {
         method: "POST",
