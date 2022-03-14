@@ -110,8 +110,9 @@ const createReportSheet = async (doc, payload) => {
   // create new sheet with title
   const sheet = await doc.addSheet({
     title: sheetName,
-    headerValues: colHeadings("all"),
+    headerValues: colHeadings("none"),
   });
+  await sheet.addRows(payload.playerRecords);
 };
 
 /** function to return from netlify function with appropriate payload */
